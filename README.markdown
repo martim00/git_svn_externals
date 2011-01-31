@@ -25,7 +25,7 @@ Features
 Known problems
 ----------
 
-1. If your external references a revision, it have to referent an existing revision 
+1. If your external references a revision, it have to reference an existing revision 
    or the script will not work. 
    For example, if in the svn log of your external the revisions 1 and 7 appear, 
    you can't reference revision 5 in the external. In this case you should reference 
