@@ -66,7 +66,7 @@ sub GitSvnCloneExternal {
 			my $command = $clone_external_command . " " . $ext_url . " " . quotemeta($ext_basename);
 			qx/$command/;
 		} else {
-			my $command = $clone_external_command . " " . $ext_rev . " " . $ext_url . " " . quotemeta($ext_basename);
+			my $command = $clone_external_command . " --revision=" . $ext_rev . " " . $ext_url . " " . quotemeta($ext_basename);
 			qx/$command/;
 		}
 	} else {
@@ -85,7 +85,7 @@ sub GitSvnCloneExternal {
 				my $git_svn_rev = $ext_rev;
 				$git_svn_rev =~ s/(-|\s)//g;
 				#print "DBG: git_svn_rev = $git_svn_rev\n";
-				my $git_sha = qx/git svn find-rev $git_svn_rev/;
+				my $git_sha = qx/git svn find-rev r$git_svn_rev/;
 				$git_sha =~ s/\n//;
 				#print "DBG: found git sha: $git_sha\n";
 				qx/$git_executable checkout master/;
@@ -99,7 +99,7 @@ sub GitSvnCloneExternal {
 				my $command = $clone_external_command . " " . $ext_url . " " . quotemeta($ext_basename);
 				qx/$command/;
 			} else {
-				my $command = $clone_external_command . " " . $ext_rev . " " . $ext_url . " " . quotemeta($ext_basename);
+				my $command = $clone_external_command . " --revision=" . $ext_rev . " " . $ext_url . " " . quotemeta($ext_basename);
 				qx/$command/;
 			}
 		}
@@ -112,7 +112,7 @@ sub GitSvnCloneExternal {
 	my $link_to_dir = $git_repo_root_dir . $git_externals_dir . "/" . $ext_path;
 	#print "DBG: Linking $link_to_dir -> $ext_basename\n";
 	qx/ln -snf "$link_to_dir" "$ext_basename"/;
-
+	
 	# exclude external from current git
 	chdir $tmp_current_working_dir or die "Error: $!\n";
 
@@ -135,17 +135,28 @@ sub GitSvnCloneExternal {
 		print GITEXCLUDE "$exclude\n";
 	}
 	close GITEXCLUDE;
-
+	
 	# recursive check for externals
 	my $external_working_dir = $tmp_current_working_dir."/".$git_externals_dir."/".$ext_dirname."/".$ext_basename;
 	chdir $external_working_dir or die "Error: $!\n";
-	&ListGitSvnExternals();
+	
+	&ListGitSvnExternals($ext_rev);
 
 	chdir $tmp_current_working_dir or die "Error: $!\n";
 }
 
 sub ListGitSvnExternals {
-	my @show_externals_output = qx/$show_externals_command/;
+	my ($ext_rev_base) = @_;
+	$ext_rev_base ||= "";
+	
+	my @show_externals_output;
+	if ($ext_rev_base =~ m/^$/) {
+		@show_externals_output = qx/$show_externals_command/;
+	} else {
+		my $command = $show_externals_command . " --revision=" . $ext_rev_base;
+		@show_externals_output = qx/$command/;
+	}
+	
 	my $line;
 	my @externals;
 	foreach $line (@show_externals_output) {
@@ -166,7 +177,7 @@ sub ListGitSvnExternals {
 	my $ext_rev;
 	my $ext_url;
 	foreach $external (@externals) {
-		if ($external =~ m/(.+)\s(-r\s\S+)\s((file:|http:|https:|svn:|svn\+ssh:)\S+)/) {
+		if ($external =~ m/(.+)\s-r\s*(\S+)\s+((file:|http:|https:|svn:|svn\+ssh:)\S+)/) {
 			# found an external with revision specified
 			$ext_path = $1;
 			$ext_rev  = $2;
