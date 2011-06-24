@@ -31,6 +31,33 @@ sub IsGitRepository {
 	}
 }
 
+sub Exec
+{
+	my ($cmd) = @_;
+	
+#	print " *************************************** RUNNING: $cmd \n";
+	
+	my $ret = qx/$cmd/;
+	
+#	print " *************************************** RETURN: $ret \n";
+	
+	return $ret;
+}
+
+sub ExecArr
+{
+	my ($cmd) = @_;
+	
+#	print " *************************************** RUNNING: $cmd \n";
+	
+	my @ret = qx/$cmd/;
+	
+#	print " *************************************** RETURN: " . scalar(@ret) . " lines \n";
+#	print @ret;
+	
+	return @ret;
+}
+
 sub GitSvnCloneExternal {
 	my ($ext_path, $ext_url, $ext_rev) = @_;
 	$ext_rev ||= "";
@@ -63,11 +90,9 @@ sub GitSvnCloneExternal {
 		print "NFO: External directory doesn't exist\n";
 		# external directory doesn't exist
 		if ($ext_rev =~ m/^$/) {
-			my $command = $clone_external_command . " " . $ext_url . " " . quotemeta($ext_basename);
-			qx/$command/;
+			Exec($clone_external_command . " " . $ext_url . " " . quotemeta($ext_basename));
 		} else {
-			my $command = $clone_external_command . " --revision=" . $ext_rev . " " . $ext_url . " " . quotemeta($ext_basename);
-			qx/$command/;
+			Exec($clone_external_command . " --revision=" . $ext_rev . " " . $ext_url . " " . quotemeta($ext_basename));
 		}
 	} else {
 		print "NFO: External directory exists\n";
@@ -78,40 +103,38 @@ sub GitSvnCloneExternal {
 		if (1 == $is_git_repo) {
 			print "NFO: External already cloned, updating\n";
 			if ($ext_rev =~ m/^$/) {
-				qx/$git_svn_pull_command/;
+				Exec($git_svn_pull_command);
 			} else {
-				qx/$git_svn_pull_command/;
+				Exec($git_svn_pull_command);
 				# now find the git commit sha of the interesting revision
 				my $git_svn_rev = $ext_rev;
 				$git_svn_rev =~ s/(-|\s)//g;
 				#print "DBG: git_svn_rev = $git_svn_rev\n";
-				my $git_sha = qx/git svn find-rev r$git_svn_rev/;
+				my $git_sha = Exec("git svn find-rev r$git_svn_rev");
 				$git_sha =~ s/\n//;
 				#print "DBG: found git sha: $git_sha\n";
-				qx/$git_executable checkout master/;
-				qx/$git_executable branch -f __git_ext_br $git_sha/;
-				qx/$git_executable checkout __git_ext_br/;
+				Exec("$git_executable checkout master");
+				Exec("$git_executable branch -f __git_ext_br $git_sha");
+				Exec("$git_executable checkout __git_ext_br");
 			}
 			chdir $tmp_wd or die "Error: $!\n";
 		} else {
 			chdir $tmp_wd or die "Error: $!\n";
 			if ($ext_rev =~ m/^$/) {
-				my $command = $clone_external_command . " " . $ext_url . " " . quotemeta($ext_basename);
-				qx/$command/;
+				Exec($clone_external_command . " " . $ext_url . " " . quotemeta($ext_basename));
 			} else {
-				my $command = $clone_external_command . " --revision=" . $ext_rev . " " . $ext_url . " " . quotemeta($ext_basename);
-				qx/$command/;
+				Exec($clone_external_command . " --revision=" . $ext_rev . " " . $ext_url . " " . quotemeta($ext_basename));
 			}
 		}
 	}
 
 	my $tmp_ext_dir = $tmp_current_working_dir . "/" . $ext_dirname;
 	chdir $tmp_ext_dir or die "Error: $!\n";
-	my $git_repo_root_dir = qx/git rev-parse --show-cdup/;
+	my $git_repo_root_dir = Exec("git rev-parse --show-cdup");
 	$git_repo_root_dir =~ s/\n$//;
 	my $link_to_dir = $git_repo_root_dir . $git_externals_dir . "/" . $ext_path;
 	#print "DBG: Linking $link_to_dir -> $ext_basename\n";
-	qx/ln -snf "$link_to_dir" "$ext_basename"/;
+	Exec("ln -snf \"$link_to_dir\" \"$ext_basename\"");
 	
 	# exclude external from current git
 	chdir $tmp_current_working_dir or die "Error: $!\n";
@@ -145,25 +168,33 @@ sub GitSvnCloneExternal {
 	chdir $tmp_current_working_dir or die "Error: $!\n";
 }
 
+sub Trim
+{
+	my $string = shift;
+	$string =~ s/^\s+//;
+	$string =~ s/\s+$//;
+	return $string;
+}
+
 sub ListGitSvnExternals {
 	my ($ext_rev_base) = @_;
 	$ext_rev_base ||= "";
 	
 	my @show_externals_output;
 	if ($ext_rev_base =~ m/^$/) {
-		@show_externals_output = qx/$show_externals_command/;
+		@show_externals_output = ExecArr($show_externals_command);
 	} else {
-		my $command = $show_externals_command . " --revision=" . $ext_rev_base;
-		@show_externals_output = qx/$command/;
+		@show_externals_output = ExecArr($show_externals_command . " --revision=" . $ext_rev_base);
 	}
 	
 	my $line;
 	my @externals;
 	foreach $line (@show_externals_output) {
 		$line =~ s/\n$//;
-		if ($line =~ m/^# \//) {
-			next;
-		} elsif ($line =~ m/^$/) {
+		$line =~ s/#.*$//; 
+		$line = Trim($line);
+		
+		if ($line =~ m/^$/) {
 			next;
 		} else {
 			#print "DBG: Found external: $line\n";
