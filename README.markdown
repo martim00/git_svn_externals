@@ -35,3 +35,5 @@ Author
 ----------
 
 Dmitry Sushko <Dmitry.Sushko@yahoo.com>
+
+Ricardo Pescuma Domenecci
