@@ -22,6 +22,7 @@ my $clone_external_command = "$git_executable svn clone";
 my $git_svn_pull_command   = "$git_executable svn fetch && $git_executable svn rebase";
 my $git_svn_fetch_command  = "$git_executable svn fetch";
 my $git_svn_rebase_command = "$git_executable svn rebase";
+my $git_get_svn_url = "git svn info --url";
 
 sub IsGitRepository {
 	if (-d $git_directory) {
@@ -99,8 +100,29 @@ sub GitSvnCloneExternal {
 		# directory already exists
 		my $tmp_wd = cwd();
 		chdir $ext_basename or die "Error: $!\n";
-		my $is_git_repo = &IsGitRepository;
-		if (1 == $is_git_repo) {
+		
+		my $is_git_repo = IsGitRepository();
+		
+		if ($is_git_repo) 
+		{
+			my $old_url = Exec($git_get_svn_url);
+			$old_url =~ s/\n$//;
+			
+			if ($old_url ne $ext_url)
+			{
+				print "NFO: Changed svn url for this path: [$old_url] - [$ext_url]\n";
+				print "NFO: Deleting old files and fetching again\n";
+				
+				chdir $tmp_wd or die "Error: $!\n";
+				
+				unlink($tmp_current_working_dir . "/" . $ext_dirname . "/" . $ext_basename);
+				rmtree($ext_basename) or die "Error: $!\n";
+				
+				$is_git_repo = 0;
+			}
+		}
+		
+		if ($is_git_repo) {
 			print "NFO: External already cloned, updating\n";
 			if ($ext_rev =~ m/^$/) {
 				Exec($git_svn_pull_command);
