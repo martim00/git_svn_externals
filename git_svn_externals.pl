@@ -156,8 +156,13 @@ sub GitSvnCloneExternal {
 	$git_repo_root_dir =~ s/\n$//;
 	my $link_to_dir = $git_repo_root_dir . $git_externals_dir . "/" . $ext_path;
 	#print "DBG: Linking $link_to_dir -> $ext_basename\n";
-	Exec("ln -snf \"$link_to_dir\" \"$ext_basename\"");
-	
+
+   my $osname = $^O;
+   if( $osname eq 'MSWin32' ) {
+      Exec("mklink \/j \"$ext_basename\" \"$link_to_dir\"");
+   } else {
+      Exec("ln -snf \"$link_to_dir\" \"$ext_basename\"");
+   }
 	# exclude external from current git
 	chdir $tmp_current_working_dir or die "Error: $!\n";
 
@@ -198,6 +203,91 @@ sub Trim
 	return $string;
 }
 
+sub ExternalWithRevisionMatches {
+
+   my $external = shift;
+	my $ext_path = shift;
+	my $ext_rev = shift;
+	my $ext_url = shift;
+
+   if ($external =~ m/(.+)\s-r\s*(\S+)\s+((file:|http:|https:|svn:|svn\+ssh:)\S+)/) {
+
+      # found an external with revision specified
+      $$ext_path = $1;
+      $$ext_rev  = $2;
+      $$ext_url  = $3;
+      $$ext_path =~ s/\///;
+      return 1;
+   }
+   elsif ($external =~ m/((file:|http:|https:|svn:|svn\+ssh:)\S+)@(.+)\s(.+)/) {
+			# found an external with revision specified
+			$$ext_path = $4;
+			$$ext_rev  = $3;
+			$$ext_url  = $1;
+			$$ext_path =~ s/\///;
+         return 1;
+   }
+
+   return 0;
+}
+
+sub ExternalWithoutRevisionMatches {
+
+   my $external = shift;
+	my $ext_path = shift;
+	my $ext_url = shift;
+
+   if ($external =~ m/(.+)\s((file:|http:|https:|svn:|svn\+ssh:)\S+)/) {
+      # found an external without revision specified
+      $$ext_path = $1;
+      $$ext_url  = $2;
+      $$ext_path =~ s/\///;
+      return 1;
+   }
+	elsif ($external =~ m/((file:|http:|https:|svn:|svn\+ssh:)\S+)\s(\S+)/) {
+      # found an external without revision specified
+      $$ext_path = $3;
+      $$ext_url  = $1;
+      #$ext_path =~ s/\///;
+      return 1;
+   }
+
+   return 0;
+}
+
+sub ExternalMatches {
+
+   my $external = shift;
+
+   my $ext_path = ""; 
+   my $ext_url = "";
+   my $ext_rev = "";
+
+   if (ExternalWithRevisionMatches($external, \$ext_path, \$ext_url, \$ext_rev)) {
+
+      print colored ['green'],
+      "==================================================\n";
+      print colored ['cyan'],
+      "External found:\n" .
+      "   path: $ext_path\n" .
+      "   rev : $ext_rev\n" .
+      "   url : $ext_url\n";
+
+      &GitSvnCloneExternal ($ext_path, $ext_url, $ext_rev);
+   }
+   elsif (ExternalWithoutRevisionMatches($external, \$ext_path, \$ext_url)) {
+
+      # found an external without revision specified
+      print colored ['green'],
+      "==================================================\n";
+      print colored ['cyan'],
+      "External found:\n" .
+      "   path: $ext_path\n" .
+      "   url : $ext_url\n";
+      &GitSvnCloneExternal ($ext_path, $ext_url);
+   }
+}
+
 sub ListGitSvnExternals {
 	my ($ext_rev_base) = @_;
 	$ext_rev_base ||= "";
@@ -230,36 +320,11 @@ sub ListGitSvnExternals {
 	my $ext_rev;
 	my $ext_url;
 	foreach $external (@externals) {
-		if ($external =~ m/(.+)\s-r\s*(\S+)\s+((file:|http:|https:|svn:|svn\+ssh:)\S+)/) {
-			# found an external with revision specified
-			$ext_path = $1;
-			$ext_rev  = $2;
-			$ext_url  = $3;
-			$ext_path =~ s/\///;
-			print colored ['green'],
-			"==================================================\n";
-			print colored ['cyan'],
-			"External found:\n" .
-			    "   path: $ext_path\n" .
-			    "   rev : $ext_rev\n" .
-			    "   url : $ext_url\n";
-			&GitSvnCloneExternal ($ext_path, $ext_url, $ext_rev);
-		} elsif ($external =~ m/(.+)\s((file:|http:|https:|svn:|svn\+ssh:)\S+)/) {
-			# found an external without revision specified
-			$ext_path = $1;
-			$ext_url  = $2;
-			$ext_path =~ s/\///;
-			print colored ['green'],
-			"==================================================\n";
-			print colored ['cyan'],
-			"External found:\n" .
-			    "   path: $ext_path\n" .
-			    "   url : $ext_url\n";
-			&GitSvnCloneExternal ($ext_path, $ext_url);
-		} else {
+
+      unless (ExternalMatches($external)) {
 			print colored ['red'], "ERR: Malformed external specified: $external\n";
 			next;
-		}
+      }
 	}
 }
 
