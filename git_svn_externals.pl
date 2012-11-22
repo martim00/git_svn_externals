@@ -220,12 +220,12 @@ sub ExternalWithRevisionMatches {
       return 1;
    }
    elsif ($external =~ m/((file:|http:|https:|svn:|svn\+ssh:)\S+)@(.+)\s(.+)/) {
-			# found an external with revision specified
-			$$ext_path = $4;
-			$$ext_rev  = $3;
-			$$ext_url  = $1;
-			$$ext_path =~ s/\///;
-         return 1;
+      # found an external with revision specified
+      $$ext_path = $4;
+      $$ext_rev  = $3;
+      $$ext_url  = $1;
+      $$ext_path =~ s/\///;
+      return 1;
    }
 
    return 0;
@@ -274,6 +274,7 @@ sub ExternalMatches {
       "   url : $ext_url\n";
 
       &GitSvnCloneExternal ($ext_path, $ext_url, $ext_rev);
+      return 1;
    }
    elsif (ExternalWithoutRevisionMatches($external, \$ext_path, \$ext_url)) {
 
@@ -285,7 +286,9 @@ sub ExternalMatches {
       "   path: $ext_path\n" .
       "   url : $ext_url\n";
       &GitSvnCloneExternal ($ext_path, $ext_url);
+      return 1;
    }
+   return 0;
 }
 
 sub ListGitSvnExternals {
