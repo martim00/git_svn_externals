@@ -155,11 +155,19 @@ sub GitSvnCloneExternal {
 	my $git_repo_root_dir = Exec("git rev-parse --show-cdup");
 	$git_repo_root_dir =~ s/\n$//;
 	my $link_to_dir = $git_repo_root_dir . $git_externals_dir . "/" . $ext_path;
-	#print "DBG: Linking $link_to_dir -> $ext_basename\n";
+	print "DBG: Linking $link_to_dir -> $ext_basename\n";
+	print "CWD: " . cwd() . "\n";
 
    my $osname = $^O;
    if( $osname eq 'MSWin32' ) {
       Exec("mklink \/j \"$ext_basename\" \"$link_to_dir\"");
+   } elsif( $osname eq 'cygwin' ) {
+       my $ext_basename_backslash = $ext_basename;
+       $ext_basename_backslash =~ s/\//\\/g;
+       my $link_to_dir_backslash = $link_to_dir;
+       $link_to_dir_backslash =~ s/\//\\/g;
+      print "cygstart c:\/windows\/system32\/cmd \/c mklink \/D \"$ext_basename_backslash\" \"$link_to_dir_backslash\"";
+      Exec("cygstart c:\/windows\/system32\/cmd \/c mklink \/D \"$ext_basename_backslash\" \"$link_to_dir_backslash\"");
    } else {
       Exec("ln -snf \"$link_to_dir\" \"$ext_basename\"");
    }
@@ -207,8 +215,8 @@ sub ExternalWithRevisionMatches {
 
    my $external = shift;
 	my $ext_path = shift;
-	my $ext_rev = shift;
 	my $ext_url = shift;
+	my $ext_rev = shift;
 
    if ($external =~ m/(.+)\s-r\s*(\S+)\s+((file:|http:|https:|svn:|svn\+ssh:)\S+)/) {
 
@@ -234,8 +242,8 @@ sub ExternalWithRevisionMatches {
 sub ExternalWithoutRevisionMatches {
 
    my $external = shift;
-	my $ext_path = shift;
-	my $ext_url = shift;
+   my $ext_path = shift;
+   my $ext_url = shift;
 
    if ($external =~ m/(.+)\s((file:|http:|https:|svn:|svn\+ssh:)\S+)/) {
       # found an external without revision specified
@@ -244,8 +252,8 @@ sub ExternalWithoutRevisionMatches {
       $$ext_path =~ s/\///;
       return 1;
    }
-	elsif ($external =~ m/((file:|http:|https:|svn:|svn\+ssh:)\S+)\s(\S+)/) {
-      # found an external without revision specified
+   elsif ($external =~ m/((file:|http:|https:|svn:|svn\+ssh:)\S+)\s(\S+)/) {
+       # found an external without revision specified
       $$ext_path = $3;
       $$ext_url  = $1;
       #$ext_path =~ s/\///;
@@ -294,27 +302,24 @@ sub ExternalMatches {
 sub ListGitSvnExternals {
 	my ($ext_rev_base) = @_;
 	$ext_rev_base ||= "";
-	
+
 	my @show_externals_output;
 	if ($ext_rev_base =~ m/^$/) {
 		@show_externals_output = ExecArr($show_externals_command);
 	} else {
 		@show_externals_output = ExecArr($show_externals_command . " --revision=" . $ext_rev_base);
 	}
-	
+
 	my $line;
 	my @externals;
 	foreach $line (@show_externals_output) {
 		$line =~ s/\n$//;
-		$line =~ s/#.*$//; 
+		$line =~ s/#.*$//;
 		$line = Trim($line);
-		
-		if ($line =~ m/^$/) {
-			next;
-		} else {
-			#print "DBG: Found external: $line\n";
-			push(@externals, $line);
-		}
+
+		next if ($line =~ m/^$/ || $line =~ m/^\e\[.*$/);
+		print "DBG: Found external: $line\n";
+		push(@externals, $line);
 	}
 
 	my @external_hashes;
@@ -324,10 +329,10 @@ sub ListGitSvnExternals {
 	my $ext_url;
 	foreach $external (@externals) {
 
-      unless (ExternalMatches($external)) {
-			print colored ['red'], "ERR: Malformed external specified: $external\n";
-			next;
-      }
+	    unless (ExternalMatches($external)) {
+		print colored ['red'], "ERR: Malformed external specified: $external\n";
+		next;
+	    }
 	}
 }
 
