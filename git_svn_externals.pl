@@ -23,6 +23,7 @@ my $git_svn_pull_command   = "$git_executable svn fetch && $git_executable svn r
 my $git_svn_fetch_command  = "$git_executable svn fetch";
 my $git_svn_rebase_command = "$git_executable svn rebase";
 my $git_get_svn_url = "git svn info --url";
+my $svn_log_command = "svn log -l 1 -r ";
 
 sub IsGitRepository {
 	if (-d $git_directory) {
@@ -59,9 +60,26 @@ sub ExecArr
 	return @ret;
 }
 
+sub GetValidRevisionFromSvn {
+    my $url = shift;
+    my $revision = shift;
+    print colored['red'], "Verifying last valid revision from : " . $url . "\n";
+    my $info_cmd = $svn_log_command . " " . $$revision . ":1 " . $url;
+    print colored['red'], "Executing : " . $svn_log_command . "\n";
+    my @last_revision = qx($info_cmd);
+
+    $last_revision[1] =~ m/^r([0-9]+)/;
+    $$revision = $1;
+}
+
 sub GitSvnCloneExternal {
 	my ($ext_path, $ext_url, $ext_rev) = @_;
 	$ext_rev ||= "";
+	if($ext_rev ne "") {
+	    print colored['red'], "DBG: Old revision: " . $ext_rev . "\n";
+	    GetValidRevisionFromSvn($ext_url, \$ext_rev);
+	    print colored['red'], "DBG: New revision: " . $ext_rev . "\n";
+	}
 
 	my $ext_basename = basename($ext_path);
 	my $ext_dirname  = dirname($ext_path);
